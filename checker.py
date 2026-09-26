@@ -10,6 +10,7 @@ import json, re, difflib
 import anthropic
 
 MODEL = "claude-sonnet-5"   # change if your key uses a different model
+FALLBACK_MODEL = "claude-sonnet-4-6"   # used automatically if MODEL is rejected as not found
 client = anthropic.Anthropic()
 
 # ---------------------------------------------------------------- prompt
@@ -69,6 +70,18 @@ SCHEMA = {
 
 
 def _call_llm(source, summary):
+    global MODEL
+    try:
+        return _call_model(source, summary)
+    except anthropic.NotFoundError:
+        if MODEL == FALLBACK_MODEL:
+            raise
+        print(f"      [model {MODEL} not found, switching to {FALLBACK_MODEL}]")
+        MODEL = FALLBACK_MODEL
+        return _call_model(source, summary)
+
+
+def _call_model(source, summary):
     user = (f"<reference>\n{source}\n</reference>\n\n<candidate>\n{summary}\n</candidate>\n\n"
             "Audit every claim in the candidate.")
     # No temperature: SDK 1.x dropped the kwarg and current models reject sampling params.
